@@ -1,0 +1,91 @@
+# API Gateway configuration
+
+Resources:
+  # The API Gateway REST API
+  APIGatewayRestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      # Set the API to be publicly accessible
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+  
+  # The API Gateway resource that will serve the React application
+  APIGatewayResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref APIGatewayRestApi
+      ParentId: !GetAtt APIGatewayRestApi.RootResourceId
+      PathPart: "{proxy+}"
+  
+  # The API Gateway method that will serve the React application
+  APIGatewayMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      HttpMethod: ANY
+      ResourceId: !Ref APIGatewayResource
+      RestApiId: !Ref APIGatewayRestApi
+      # Set the method to use Lambda as its integration type
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunction.Arn}/invocations
+  
+  # The Lambda function that will serve the React application
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      # Set the function code to be a deployment package for your React application
+      Code:
+        ZipFile: |
+          const fs = require('fs');
+          const path = require('path');
+          const AWS = require('aws-sdk');
+
+          const s3 = new AWS.S3();
+          const cloudfront = new AWS.CloudFront();
+
+          exports.handler = async (event) => {
+            // Get the request path from the event data
+            const requestPath = event.path;
+
+            // Check if the request path is for a file in the S3 bucket
+            const s3Object = await s3.headObject({
+              Bucket: '<your-s3-bucket-name>',
+              Key: requestPath,
+            }).promise();
+
+            if (s3Object) {
+              // If the request path is for a file in the S3 bucket, redirect the request to the corresponding CloudFront URL
+              return {
+                statusCode: 301,
+                headers: {
+                  Location: `https://<your-cloudfront-distribution-id>.cloudfront.net${requestPath}`,
+                },
+              };
+            } else {
+              // Otherwise, serve the React application's index.html file
+              const filePath = path.join(__dirname, 'index.html');
+              const fileData = fs.readFileSync(filePath);
+              return {
+                statusCode: 200,
+                headers: {
+                  'Content-Type': 'text/html',
+                },
+                body: fileData.toString(),
+              };
+            }
+          };
+      # Set the function runtime to Node.js 12.x
+      Runtime: nodejs12.x
+      # Set the function execution role to have permissions to access the S3 bucket and CloudFront distribution
+      Role: <your-function-execution-role-arn>
+      # Set the function to be triggered by API Gateway
+      Events:
+        APIGateway:
+          Type: Api
+          Properties:
+            RestApiId: !Ref APIGatewayRestApi
+            Path: /{proxy+}
+            Method: ANY
+

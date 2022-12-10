@@ -1,0 +1,12 @@
+# S3 bucket configuration
+
+Resources:
+  # The S3 bucket where the React application will be stored
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      # Set the bucket to be publicly accessible
+      AccessControl: PublicRead
+      # Enable website hosting for the bucket
+      WebsiteConfiguration:
+        IndexDocument: index.html

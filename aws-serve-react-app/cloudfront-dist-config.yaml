@@ -1,0 +1,28 @@
+# CloudFront distribution configuration
+
+Resources:
+  # The CloudFront distribution for the React application
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      # Set the distribution to use the S3 bucket as its origin
+      Origins:
+        - Id: S3BucketOrigin
+          DomainName: !GetAtt S3Bucket.DomainName
+          S3OriginConfig: {}
+      # Set the default cache behavior for the distribution
+      DefaultCacheBehavior:
+        TargetOriginId: S3BucketOrigin
+        ViewerProtocolPolicy: redirect-to-https
+        # Forward the following request headers to the origin
+        ForwardedValues:
+          QueryString: false
+          Headers:
+            - Accept
+            - Accept-Encoding
+            - Accept-Language
+            - Referer
+      # Enable HTTPS for the distribution
+      ViewerCertificate:
+        AcmCertificateArn: <your-certificate-arn>
+        SslSupportMethod: sni-only
